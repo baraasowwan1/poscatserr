@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: sowwan-pos-api
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build && node dist/scripts/seed.js
+    startCommand: node dist/server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        value: mongodb+srv://broosowwan_db_user:dEBqRAfuO37lSdl5@poscat.frahlyo.mongodb.net/sowwan_pos?retryWrites=true&w=majority&appName=poscat
+      - key: JWT_SECRET
+        value: SowwanPOS_JWT_Super_Secret_2026_XkQ9mP
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: JWT_REFRESH_SECRET
+        value: SowwanPOS_Refresh_Super_Secret_2026_Lz3nR
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: FRONTEND_URL
+        sync: false   # set this manually in Render dashboard after Vercel deploy

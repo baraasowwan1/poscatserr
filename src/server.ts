@@ -27,8 +27,19 @@ connectDB();
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 app.use(helmet());
+// Accept multiple allowed origins (comma-separated in FRONTEND_URL or wildcard)
+const allowedOrigins = (process.env.FRONTEND_URL || "*")
+  .split(",").map(o => o.trim()).filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    // Allow wildcard
+    if (allowedOrigins.includes("*")) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],

@@ -27,6 +27,7 @@ export interface ISale extends Document {
   status: "completed" | "pending" | "refunded" | "cancelled";
   notes?: string;
   refundReason?: string;
+  storeSlug?: string;
   createdAt: Date;
 }
 
@@ -65,6 +66,7 @@ const SaleSchema = new Schema<ISale>({
   },
   notes:        { type: String },
   refundReason: { type: String },
+  storeSlug:    { type: String, required: false, default: "", index: true },
 }, { timestamps: true });
 
 // Auto-generate invoice number

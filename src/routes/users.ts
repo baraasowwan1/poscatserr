@@ -3,7 +3,7 @@ import { User } from "../models/User";
 import { protect, authorize, AuthRequest } from "../middleware/auth";
 
 const router = Router();
-router.use(protect, authorize("superadmin", "admin"));
+router.use(protect, authorize("superadmin", "admin", "مالك المنصة", "مدير النظام"));
 
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {

@@ -47,23 +47,36 @@ router.post("/stores", platformOnly, async (req, res) => {
       trialEndsAt: new Date(Date.now() + 14 * 864e5),
     });
 
-    // 2. Create admin user for the store (separate — simpler, no transactions needed)
+    // 2. Create admin user — ensure unique username/email by appending slug suffix
     let adminUser = null;
+    let adminError = null;
     if (req.body.adminUsername && req.body.adminPassword) {
-      try {
-        adminUser = await User.create({
-          name:       req.body.ownerName || req.body.adminUsername,
-          email:      `${req.body.adminUsername}@${slug}.pos`,
-          username:   req.body.adminUsername.toLowerCase(),
-          password:   req.body.adminPassword,
-          role:       "مدير النظام",
-          permissions: 8,
-          storeSlug:  slug,
-          status:     "نشط",
-        });
-      } catch (userErr: any) {
-        // User creation failed — store created but log the error
-        console.error("Admin user creation failed:", userErr.message);
+      // Try with original username first, then with slug suffix if conflict
+      const candidates = [
+        req.body.adminUsername.toLowerCase(),
+        `${req.body.adminUsername.toLowerCase()}_${slug.replace(/-/g,"").slice(0,6)}`,
+        `admin_${slug.replace(/-/g,"").slice(0,10)}`,
+        `admin_${Date.now().toString().slice(-6)}`,
+      ];
+
+      for (const uname of candidates) {
+        try {
+          adminUser = await User.create({
+            name:       req.body.ownerName || uname,
+            email:      `${uname}@${slug}.pos`,
+            username:   uname,
+            password:   req.body.adminPassword,
+            role:       "مدير النظام",
+            permissions: 8,
+            storeSlug:  slug,
+            status:     "نشط",
+          });
+          break; // success — stop trying
+        } catch (e: any) {
+          adminError = e.message;
+          if (!e.message?.includes("duplicate") && !e.message?.includes("E11000")) break;
+          // E11000 = duplicate key — try next candidate
+        }
       }
     }
 
@@ -71,6 +84,8 @@ router.post("/stores", platformOnly, async (req, res) => {
       success: true,
       data: store,
       adminCreated: !!adminUser,
+      adminUsername: adminUser ? (adminUser as any).username : null,
+      adminError: adminUser ? null : adminError,
     });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message || "فشل إنشاء المتجر" });

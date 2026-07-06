@@ -23,6 +23,7 @@ export interface IProduct extends Document {
   vatRate: number;
   expiryDate?: Date;
   batchNumber?: string;
+  storeSlug?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +55,7 @@ const ProductSchema = new Schema<IProduct>({
   vatRate:      { type: Number, default: 0.16 },
   expiryDate:   { type: Date },
   batchNumber:  { type: String },
+  storeSlug:    { type: String, required: false, default: "", index: true },
 }, { timestamps: true });
 
 // Auto-update status based on stock

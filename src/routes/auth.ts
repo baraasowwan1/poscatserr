@@ -18,13 +18,25 @@ router.post("/login", async (req: Request, res: Response) => {
       return;
     }
 
-    // Build query — if storeSlug provided, search only within that store
+    // Build query — search by username/email, optionally scoped to store
     const baseQuery = { $or: [{ username: credential.toLowerCase() }, { email: credential.toLowerCase() }] };
-    const query = requestedSlug && requestedSlug !== "__platform__"
-      ? { ...baseQuery, storeSlug: requestedSlug } as any
-      : baseQuery;
+    let user = null;
 
-    const user = await User.findOne(query).select("+password");
+    if (requestedSlug && requestedSlug !== "__platform__") {
+      // Try exact storeSlug match first
+      user = await User.findOne({ ...baseQuery, storeSlug: requestedSlug } as any).select("+password");
+      // If not found, try without storeSlug restriction (handles mismatched slugs)
+      if (!user) {
+        user = await User.findOne(baseQuery).select("+password");
+        // Verify it's not a platform admin trying to access a store
+        if (user && user.role === "مالك المنصة") {
+          res.status(403).json({ success: false, message: "مالك المنصة لا يدخل عبر رابط المتجر" });
+          return;
+        }
+      }
+    } else {
+      user = await User.findOne(baseQuery).select("+password");
+    }
 
     if (!user || !(await user.matchPassword(password))) {
       res.status(401).json({ success: false, message: "بيانات الدخول غير صحيحة" });
@@ -73,7 +85,17 @@ router.post("/login", async (req: Request, res: Response) => {
 router.get("/store-check/:slug", async (req: Request, res: Response) => {
   try {
     const { TenantStore } = await import("../models/TenantStore") as any;
-    const store = await TenantStore.findOne({ slug: req.params.slug });
+    const s = req.params.slug;
+    // Search by slug OR storeId (handles stores created before slug field was added)
+    const store = await TenantStore.findOne({
+      $or: [
+        { slug: s },
+        { storeId: s },
+        { storeId: `store_${s}` },
+        // Also try matching by store name converted to simple slug
+        { name: new RegExp(`^${s.replace(/-/g, '\\s*')}$`, 'i') }
+      ]
+    });
     if (!store) return res.status(404).json({ success: false, message: "المتجر غير موجود" });
     if (store.status === "suspended") return res.status(403).json({ success: false, message: "هذا المتجر معلق" });
     const trialExpired = store.status === "trial" && store.trialEndsAt && new Date(store.trialEndsAt) < new Date();

@@ -14,6 +14,7 @@ export interface ICustomer extends Document {
   status: "active" | "inactive" | "vip" | "premium";
   creditBalance: number;
   debtBalance: number;
+  storeSlug?: string;
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ const CustomerSchema = new Schema<ICustomer>({
   },
   creditBalance: { type: Number, default: 0 },
   debtBalance:   { type: Number, default: 0 },
+  storeSlug:     { type: String, required: false, default: "", index: true },
 }, { timestamps: true });
 
 CustomerSchema.index({ name: "text", phone: "text" });

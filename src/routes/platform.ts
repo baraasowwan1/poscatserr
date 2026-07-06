@@ -26,15 +26,12 @@ router.get("/stores", platformOnly, async (_req, res) => {
 });
 
 router.post("/stores", platformOnly, async (req, res) => {
-  const mongoose = (await import("mongoose")).default;
-  const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-    const plan = await Plan.findOne({ _id: req.body.planId }).session(session);
+    const plan = await Plan.findOne({ _id: req.body.planId });
     const slug = req.body.slug || `store-${Date.now()}`;
 
-    // Create store
-    const [store] = await TenantStore.create([{
+    // 1. Create store
+    const store = await TenantStore.create({
       ...req.body,
       slug,
       storeId: `store_${Date.now()}`,
@@ -43,30 +40,35 @@ router.post("/stores", platformOnly, async (req, res) => {
       maxBranches: plan?.maxBranches ?? 1,
       status: "trial",
       trialEndsAt: new Date(Date.now() + 14 * 864e5),
-    }], { session });
+    });
 
-    // Create admin user for the store if provided
+    // 2. Create admin user for the store (separate — simpler, no transactions needed)
+    let adminUser = null;
     if (req.body.adminUsername && req.body.adminPassword) {
-      const bcrypt = await import("bcryptjs");
-      await User.create([{
-        name:      req.body.ownerName || req.body.adminUsername,
-        email:     `${req.body.adminUsername}@${slug}.pos`,
-        username:  req.body.adminUsername,
-        password:  req.body.adminPassword, // pre-save hook hashes it
-        role:      "مدير النظام",
-        permissions: 8,
-        storeSlug: slug,
-        status:    "نشط",
-      }], { session });
+      try {
+        adminUser = await User.create({
+          name:       req.body.ownerName || req.body.adminUsername,
+          email:      `${req.body.adminUsername}@${slug}.pos`,
+          username:   req.body.adminUsername.toLowerCase(),
+          password:   req.body.adminPassword,
+          role:       "مدير النظام",
+          permissions: 8,
+          storeSlug:  slug,
+          status:     "نشط",
+        });
+      } catch (userErr: any) {
+        // User creation failed — store created but log the error
+        console.error("Admin user creation failed:", userErr.message);
+      }
     }
 
-    await session.commitTransaction();
-    res.status(201).json({ success: true, data: store });
+    res.status(201).json({
+      success: true,
+      data: store,
+      adminCreated: !!adminUser,
+    });
   } catch (err: any) {
-    await session.abortTransaction();
     res.status(400).json({ success: false, message: err.message || "فشل إنشاء المتجر" });
-  } finally {
-    session.endSession();
   }
 });
 

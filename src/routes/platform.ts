@@ -27,7 +27,12 @@ router.get("/stores", platformOnly, async (_req, res) => {
 
 router.post("/stores", platformOnly, async (req, res) => {
   try {
-    const plan = await Plan.findOne({ _id: req.body.planId });
+    // Support both ObjectId and name-based planId (e.g. "starter", "business")
+    const mongoose = (await import("mongoose")).default;
+    const planQuery = mongoose.isValidObjectId(req.body.planId)
+      ? { _id: req.body.planId }
+      : { name: new RegExp(req.body.planId, "i") };
+    const plan = await Plan.findOne(planQuery);
     const slug = req.body.slug || `store-${Date.now()}`;
 
     // 1. Create store

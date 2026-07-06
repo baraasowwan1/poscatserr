@@ -5,9 +5,16 @@ import { protect, authorize, AuthRequest } from "../middleware/auth";
 const router = Router();
 router.use(protect, authorize("superadmin", "admin", "مالك المنصة", "مدير النظام"));
 
-router.get("/", async (_req: AuthRequest, res: Response) => {
+router.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    const filter: any = {};
+    // Filter by storeSlug if provided (for store-specific user listing)
+    if (req.query.storeSlug) filter.storeSlug = req.query.storeSlug;
+    // Non-platform-owners only see their store's users
+    if (req.user?.role !== "مالك المنصة" && req.user?.storeSlug) {
+      filter.storeSlug = req.user.storeSlug;
+    }
+    const users = await User.find(filter).select("-password").sort({ createdAt: -1 });
     res.json({ success: true, data: users, total: users.length });
   } catch { res.status(500).json({ success: false, message: "خطأ في جلب المستخدمين" }); }
 });

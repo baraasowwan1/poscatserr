@@ -11,16 +11,20 @@ const signToken = (id: string) =>
 // POST /api/auth/login — supports username OR email login
 router.post("/login", async (req: Request, res: Response) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password, storeSlug: requestedSlug } = req.body;
     const credential = username || email;
     if (!credential || !password) {
       res.status(400).json({ success: false, message: "اسم المستخدم وكلمة المرور مطلوبان" });
       return;
     }
-    // Find by username or email
-    const user = await User.findOne({
-      $or: [{ username: credential.toLowerCase() }, { email: credential.toLowerCase() }]
-    }).select("+password");
+
+    // Build query — if storeSlug provided, search only within that store
+    const baseQuery = { $or: [{ username: credential.toLowerCase() }, { email: credential.toLowerCase() }] };
+    const query = requestedSlug && requestedSlug !== "__platform__"
+      ? { ...baseQuery, storeSlug: requestedSlug } as any
+      : baseQuery;
+
+    const user = await User.findOne(query).select("+password");
 
     if (!user || !(await user.matchPassword(password))) {
       res.status(401).json({ success: false, message: "بيانات الدخول غير صحيحة" });
@@ -30,11 +34,17 @@ router.post("/login", async (req: Request, res: Response) => {
       res.status(401).json({ success: false, message: "الحساب معطّل، تواصل مع المدير" });
       return;
     }
+    if (user.role === "مالك المنصة" && requestedSlug && requestedSlug !== "__platform__") {
+      res.status(403).json({ success: false, message: "مالك المنصة لا يدخل عبر رابط المتجر" });
+      return;
+    }
 
-    // Check store status for store users
+    // Check store status
     if (user.role !== "مالك المنصة" && user.storeSlug) {
       const { TenantStore } = await import("../models/TenantStore") as any;
-      const store = await TenantStore.findOne({ slug: user.storeSlug });
+      const store = await TenantStore.findOne({
+        $or: [{ slug: user.storeSlug }, { storeId: user.storeSlug }]
+      });
       if (store?.status === "suspended") {
         res.status(403).json({ success: false, message: `متجر "${store.name}" موقوف. تواصل مع إدارة المنصة.` });
         return;

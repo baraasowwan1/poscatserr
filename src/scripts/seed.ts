@@ -6,7 +6,6 @@ import mongoose from "mongoose";
 import { User } from "../models/User";
 import { Settings } from "../models/Settings";
 import Plan from "../models/Plan";
-import bcrypt from "bcryptjs";
 
 async function seed() {
   const uri = process.env.MONGODB_URI;
@@ -79,18 +78,22 @@ async function seed() {
   }
 
   // ── Platform Superadmin ────────────────────────────────────────────────────
+  const resetAdmin = process.argv.includes("--reset");
+  if (resetAdmin) {
+    await User.deleteOne({ username: "superadmin" });
+    console.log("🗑  Old superadmin deleted");
+  }
   const adminExists = await User.findOne({ username: "superadmin" });
   if (!adminExists) {
-    const hashed = await bcrypt.hash("SuperAdmin@2026", 12);
+    // Plain text — User model pre-save hook will hash it automatically
     await User.create({
       name: "مالك المنصة",
       email: "superadmin@platform.io",
       username: "superadmin",
-      password: hashed,
+      password: "SuperAdmin@2026",
       role: "مالك المنصة",
       permissions: ["*"],
       status: "نشط",
-      storeId: null,
     });
     console.log("✅ Platform owner created");
     console.log("   Username : superadmin");

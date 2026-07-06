@@ -26,17 +26,48 @@ router.get("/stores", platformOnly, async (_req, res) => {
 });
 
 router.post("/stores", platformOnly, async (req, res) => {
-  const plan = await Plan.findOne({ _id: req.body.planId });
-  const store = await TenantStore.create({
-    ...req.body,
-    storeId: `store_${Date.now()}`,
-    maxUsers: plan?.maxUsers ?? 3,
-    maxProducts: plan?.maxProducts ?? 500,
-    maxBranches: plan?.maxBranches ?? 1,
-    status: "trial",
-    trialEndsAt: new Date(Date.now() + 14 * 864e5),
-  });
-  res.status(201).json({ success: true, data: store });
+  const mongoose = (await import("mongoose")).default;
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const plan = await Plan.findOne({ _id: req.body.planId }).session(session);
+    const slug = req.body.slug || `store-${Date.now()}`;
+
+    // Create store
+    const [store] = await TenantStore.create([{
+      ...req.body,
+      slug,
+      storeId: `store_${Date.now()}`,
+      maxUsers:    plan?.maxUsers    ?? 3,
+      maxProducts: plan?.maxProducts ?? 500,
+      maxBranches: plan?.maxBranches ?? 1,
+      status: "trial",
+      trialEndsAt: new Date(Date.now() + 14 * 864e5),
+    }], { session });
+
+    // Create admin user for the store if provided
+    if (req.body.adminUsername && req.body.adminPassword) {
+      const bcrypt = await import("bcryptjs");
+      await User.create([{
+        name:      req.body.ownerName || req.body.adminUsername,
+        email:     `${req.body.adminUsername}@${slug}.pos`,
+        username:  req.body.adminUsername,
+        password:  req.body.adminPassword, // pre-save hook hashes it
+        role:      "مدير النظام",
+        permissions: 8,
+        storeSlug: slug,
+        status:    "نشط",
+      }], { session });
+    }
+
+    await session.commitTransaction();
+    res.status(201).json({ success: true, data: store });
+  } catch (err: any) {
+    await session.abortTransaction();
+    res.status(400).json({ success: false, message: err.message || "فشل إنشاء المتجر" });
+  } finally {
+    session.endSession();
+  }
 });
 
 router.put("/stores/:id", platformOnly, async (req, res) => {

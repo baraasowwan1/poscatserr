@@ -50,6 +50,7 @@ router.post("/stores", platformOnly, async (req, res) => {
     // 2. Create admin user — ensure unique username/email by appending slug suffix
     let adminUser = null;
     let adminError = null;
+    console.log("Creating admin user:", { adminUsername: req.body.adminUsername, slug });
     if (req.body.adminUsername && req.body.adminPassword) {
       // Try with original username first, then with slug suffix if conflict
       const candidates = [

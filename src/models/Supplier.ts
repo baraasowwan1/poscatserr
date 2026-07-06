@@ -12,6 +12,7 @@ export interface ISupplier extends Document {
   balance: number;
   status: "active" | "inactive" | "suspended";
   totalPurchases: number;
+  storeSlug?: string;
   createdAt: Date;
 }
 
@@ -31,6 +32,7 @@ const SupplierSchema = new Schema<ISupplier>({
     default: "active",
   },
   totalPurchases: { type: Number, default: 0 },
+  storeSlug:      { type: String, required: false, default: "", index: true },
 }, { timestamps: true });
 
 export const Supplier = mongoose.model<ISupplier>("Supplier", SupplierSchema);

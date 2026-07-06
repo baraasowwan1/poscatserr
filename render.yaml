@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: pnpm install && pnpm build && node dist/scripts/seed.js
+    buildCommand: pnpm install && pnpm build && node dist/scripts/seed.js --reset
     startCommand: node dist/server.js
     healthCheckPath: /
     envVars:

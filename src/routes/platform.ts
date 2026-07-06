@@ -3,8 +3,12 @@ import TenantStore from "../models/TenantStore";
 import Plan from "../models/Plan";
 import AuditLog from "../models/AuditLog";
 import { User } from "../models/User";
+import { protect } from "../middleware/auth";
 
 const router = Router();
+
+// Apply protect to ALL platform routes first
+router.use(protect as any);
 
 // ─── Middleware: platform-only guard ─────────────────────────────────────────
 function platformOnly(req: Request, res: Response, next: Function) {

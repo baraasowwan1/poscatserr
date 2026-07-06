@@ -59,6 +59,19 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/store-check/:slug — verify store exists and is active (public)
+router.get("/store-check/:slug", async (req: Request, res: Response) => {
+  try {
+    const { TenantStore } = await import("../models/TenantStore") as any;
+    const store = await TenantStore.findOne({ slug: req.params.slug });
+    if (!store) return res.status(404).json({ success: false, message: "المتجر غير موجود" });
+    if (store.status === "suspended") return res.status(403).json({ success: false, message: "هذا المتجر معلق" });
+    const trialExpired = store.status === "trial" && store.trialEndsAt && new Date(store.trialEndsAt) < new Date();
+    if (trialExpired) return res.status(403).json({ success: false, message: "انتهت فترة التجربة" });
+    res.json({ success: true, data: { name: store.name, sector: store.sector, status: store.status } });
+  } catch { res.status(500).json({ success: false, message: "خطأ في الخادم" }); }
+});
+
 // GET /api/auth/me
 router.get("/me", protect, async (req: AuthRequest, res: Response) => {
   res.json({ success: true, user: req.user });
